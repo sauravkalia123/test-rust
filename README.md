@@ -1,411 +1,615 @@
-# Rust Master Revision Cheat-Sheet (Interview Focused)
-
-Compact guide with **concepts + code examples**.  
-Use this for fast revision before interviews.
-
----
-
-## 1. Ownership & Borrowing
-
-Rust memory safety ka base concept hai.
-
-### Key Points
-- **Ownership** → ek variable ek value ka single owner hota hai.
-- **Move** → ownership transfer hoti hai jab assign karte ho.
-- **Borrowing** → reference dena without ownership transfer.
-- `&T` immutable borrow (multiple allowed).
-- `&mut T` mutable borrow (exclusive).
-- **Lifetimes** → compiler ensures reference valid hai.
-
-### Example
-```rust
-fn ownership_demo() {
-    let s = String::from("hello"); // owner: s
-    let r = &s;                    // borrow
-    println!("{}", r);
-
-    let s2 = s; // move ownership to s2
-    println!("{}", s2);
-
-    // println!("{}", s); // ❌ error, s moved
-}
-```
-
----
-
-## 2. Types & Collections
-
-### Key Points
-- **Array**: `[T; N]` fixed-size.
-- **Slice**: `&[T]` view into array/vec.
-- **Vec<T>**: growable heap array.
-- **String**: `String` (owned), `&str` (borrowed).
-- **HashMap<K,V>** in `std::collections`.
-
-### Example
-```rust
-use std::collections::HashMap;
-
-fn types_demo() {
-    let arr: [i32; 3] = [1, 2, 3];
-    let slice: &[i32] = &arr[0..2];
-    let mut v: Vec<i32> = vec![1, 2, 3];
-    v.push(4);
-
-    let mut map = HashMap::new();
-    map.insert("apple", 3);
-    println!("Slice: {:?}, Vec: {:?}, Map: {:?}", slice, v, map);
-}
-```
-
----
-
-## 3. Enums & Pattern Matching
-
-### Key Points
-- Enums can carry data.
-- `match` is exhaustive.
-- `if let` and `while let` simplify pattern matching.
-
-### Example
-```rust
-enum Value {
-    Int(i32),
-    Str(String),
-    Float(f64),
+Rust Master Interview Cheat-Sheet with Layman Examples
+This cheat-sheet explains key Rust concepts with simple, beginner-friendly examples to help you understand and prepare for interviews.
+1. Basics
+Ownership & Borrowing
+Rust ensures memory safety by having only one owner for data, but you can "borrow" it. Borrowing can be immutable (read-only, multiple allowed) or mutable (read-write, only one allowed).
+Example: Think of a book. Only one person owns it, but many can read it (immutable borrow). Only one person can write in it at a time (mutable borrow).
+fn main() {
+    let mut book = String::from("Rust Guide"); // book is owned
+    let reader1 = &book; // immutable borrow
+    let reader2 = &book; // another immutable borrow
+    println!("Readers: {}, {}", reader1, reader2);
+    // let writer = &mut book; // Error! Can't borrow mutably while immutable borrows exist
 }
 
-fn enum_demo(x: Value) {
-    match x {
-        Value::Int(n) => println!("int {}", n),
-        Value::Str(s) => println!("str {}", s),
-        _ => println!("something else"),
-    }
+Lifetimes
+Lifetimes ensure borrowed data isn't used after the owner is gone, preventing "dangling" references.
+Example: Imagine borrowing a friend's phone. If they leave (data is dropped), you can't use the phone anymore. Lifetimes track this.
+fn longest<'a>(s1: &'a str, s2: &'a str) -> &'a str { // 'a ensures return value lives as long as inputs
+    if s1.len() > s2.len() { s1 } else { s2 }
 }
-```
-
----
-
-## 4. Structs, impl, Constructors & Drop
-
-### Key Points
-- Structs = user-defined types.
-- `impl` block for methods.
-- `new()` idiomatic constructor.
-- Implement `Drop` for destructor logic.
-
-### Example
-```rust
-pub struct Circle {
-    radius: f64,
+fn main() {
+    let s1 = String::from("short");
+    let s2 = String::from("longer");
+    let result = longest(&s1, &s2);
+    println!("Longest: {}", result); // Works because s1 and s2 are still alive
 }
 
-impl Circle {
-    pub fn new(r: f64) -> Self {
-        Circle { radius: r }
-    }
-    pub fn area(&self) -> f64 {
-        3.14 * self.radius * self.radius
+Storage Classes
+Rust’s storage classes differ from C++. Here’s how they work:
+
+Global (module-level): Like a shared library book, accessible everywhere, defined with static or const.
+Static: Single instance with a 'static lifetime (lives for the entire program).
+Extern: For using code from other languages (e.g., C functions).
+Register: Rust doesn’t use this; the compiler optimizes automatically.
+
+Example: A library’s shared counter (static) vs. a fixed math constant (const).
+static LIBRARY_BOOKS: i32 = 100; // Single, shared value
+const PI: f64 = 3.14159; // Fixed constant
+fn main() {
+    println!("Books in library: {}", LIBRARY_BOOKS);
+    println!("Pi value: {}", PI);
+}
+
+Command Line Args
+Access command-line arguments to customize program behavior.
+Example: Imagine a program as a waiter taking your order from the command line.
+fn main() {
+    for arg in std::env::args() { // Gets arguments like "cargo run pizza burger"
+        println!("Order: {}", arg); // Prints program name, then "pizza", "burger"
     }
 }
 
-impl Drop for Circle {
-    fn drop(&mut self) {
-        println!("Dropping circle with radius {}", self.radius);
-    }
-}
-```
-
----
-
-## 5. Traits & Polymorphism
-
-### Key Points
-- Traits = interface (like pure virtual).
-- Default implementations allowed.
-- Dynamic dispatch with `Box<dyn Trait>`.
-
-### Example
-```rust
-trait Shape {
-    fn area(&self) -> f64;
-    fn name(&self) -> &str;
-}
-
-struct Rectangle { w: f64, h: f64 }
-struct Circle { r: f64 }
-
-impl Shape for Rectangle {
-    fn area(&self) -> f64 { self.w * self.h }
-    fn name(&self) -> &str { "Rectangle" }
-}
-impl Shape for Circle {
-    fn area(&self) -> f64 { 3.14 * self.r * self.r }
-    fn name(&self) -> &str { "Circle" }
-}
-
-fn trait_demo() {
-    let shapes: Vec<Box<dyn Shape>> = vec![
-        Box::new(Rectangle { w: 2.0, h: 3.0 }),
-        Box::new(Circle { r: 1.0 }),
-    ];
-    for s in shapes {
-        println!("{} area = {}", s.name(), s.area());
-    }
-}
-```
-
----
-
-## 6. Smart Pointers
-
-### Key Points
-- `Box<T>`: heap allocate, single owner.
-- `Rc<T>`: reference-counted single-threaded.
-- `Arc<T>`: atomic Rc for multi-threaded.
-- `RefCell<T>`: runtime borrow check (single-threaded).
-- `Mutex<T>`/`RwLock<T>`: thread-safe shared access.
-
-### Example
-```rust
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
-
-fn smart_demo() {
-    let b = Box::new(5);
-    println!("Box = {}", b);
-
-    let r = Rc::new(vec![1,2,3]);
-    let r2 = Rc::clone(&r);
-    println!("Rc count = {}", Rc::strong_count(&r));
-
-    let a = Arc::new(Mutex::new(0));
-    {
-        let mut g = a.lock().unwrap();
-        *g += 1;
-    }
-    println!("Arc+Mutex = {:?}", a.lock().unwrap());
-}
-```
-
----
-
-## 7. Concurrency (Threads, Mutex, Condvar)
-
-### Key Points
-- `thread::spawn` spawns a new thread.
-- `Arc<Mutex<T>>` to share mutable state.
-- `Condvar` for signaling between threads.
-- `RwLock` → multiple readers or one writer.
-
-### Example
-```rust
+2. Concurrency
+Arc + Mutex
+Arc (Atomic Reference Counting) allows multiple threads to share data safely, and Mutex ensures only one thread modifies it at a time.
+Example: A shared cookie jar. Multiple people (threads) can look at it (Arc), but only one can take a cookie (Mutex).
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-fn thread_demo() {
-    let counter = Arc::new(Mutex::new(0));
-
+fn main() {
+    let jar = Arc::new(Mutex::new(10)); // 10 cookies
     let mut handles = vec![];
-    for _ in 0..5 {
-        let c = Arc::clone(&counter);
-        let h = thread::spawn(move || {
-            let mut num = c.lock().unwrap();
-            *num += 1;
+
+    for _ in 0..3 {
+        let jar = Arc::clone(&jar);
+        let handle = thread::spawn(move || {
+            let mut cookies = jar.lock().unwrap();
+            *cookies -= 1; // Take one cookie
+            println!("Cookies left: {}", *cookies);
         });
-        handles.push(h);
+        handles.push(handle);
     }
 
-    for h in handles { h.join().unwrap(); }
-    println!("Counter = {}", *counter.lock().unwrap());
+    for handle in handles {
+        handle.join().unwrap();
+    }
 }
-```
 
----
-
-## 8. Channels (mpsc)
-
-### Key Points
-- `mpsc`: multi-producer, single-consumer.
-- `tx.send()` / `rx.recv()`.
-
-### Example
-```rust
-use std::sync::mpsc;
+Condvar
+Condvar (Condition Variable) helps threads wait for a signal to proceed.
+Example: A chef waits for ingredients to arrive before cooking.
+use std::sync::{Arc, Mutex, Condvar};
 use std::thread;
 
-fn channel_demo() {
-    let (tx, rx) = mpsc::channel();
+fn main() {
+    let pair = Arc::new((Mutex::new(false), Condvar::new()));
+    let pair2 = Arc::clone(&pair);
 
     thread::spawn(move || {
-        tx.send("hello").unwrap();
+        let (lock, cvar) = &*pair2;
+        let mut ingredients = lock.lock().unwrap();
+        *ingredients = true; // Ingredients arrived
+        cvar.notify_one(); // Signal the chef
     });
 
-    println!("Got: {}", rx.recv().unwrap());
+    let (lock, cvar) = &*pair;
+    let mut ingredients = lock.lock().unwrap();
+    while !*ingredients {
+        ingredients = cvar.wait(ingredients).unwrap(); // Wait for ingredients
+    }
+    println!("Chef starts cooking!");
 }
-```
 
----
+notify_one vs notify_all
+notify_one wakes one waiting thread; notify_all wakes all waiting threads.
+Example: notify_one is like calling one friend to join a party; notify_all is like announcing to everyone.
+use std::sync::{Arc, Mutex, Condvar};
+use std::thread;
 
-## 9. Async & Tokio
+fn main() {
+    let pair = Arc::new((Mutex::new(0), Condvar::new()));
+    let pair2 = Arc::clone(&pair);
 
-### Key Points
-- `async fn` returns `Future`.
-- Needs executor (tokio).
-- `tokio::spawn` for lightweight tasks.
+    for _ in 0..2 {
+        let pair = Arc::clone(&pair2);
+        thread::spawn(move || {
+            let (lock, cvar) = &*pair;
+            let mut count = lock.lock().unwrap();
+            *count += 1;
+            cvar.notify_all(); // Wake all waiting threads
+            println!("Thread done, count: {}", *count);
+        });
+    }
+}
 
-### Example
-```rust
+Thread Starvation
+Starvation happens when a thread can’t get the resources it needs because others keep taking them.
+Example: At a buffet, one person keeps missing food because others grab it first.
+Round-Robin with Condvar
+A round-robin scheduler lets tasks take turns using a condition variable.
+Example: Four friends take turns playing a game, signaling the next player.
+use std::sync::{Arc, Mutex, Condvar};
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let pair = Arc::new((Mutex::new(0), Condvar::new()));
+    let mut handles = vec![];
+
+    for i in 0..4 {
+        let pair = Arc::clone(&pair);
+        let handle = thread::spawn(move || {
+            let (lock, cvar) = &*pair;
+            loop {
+                let mut turn = lock.lock().unwrap();
+                if *turn % 4 == i {
+                    println!("Player {}'s turn", i);
+                    *turn += 1;
+                    cvar.notify_all();
+                }
+                turn = cvar.wait_timeout(turn, Duration::from_millis(100)).unwrap().0;
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+
+3. Async / Await
+tokio::spawn
+tokio::spawn creates lightweight async tasks.
+Example: Like assigning multiple waiters to serve tables without waiting for each to finish.
+use tokio::task;
+
+#[tokio::main]
+async fn main() {
+    let handle = tokio::spawn(async {
+        println!("Waiter 1 serving...");
+    });
+    println!("Main keeps running!");
+    handle.await.unwrap();
+}
+
+Don’t Block with thread::sleep
+Use tokio::time::sleep in async code to avoid blocking other tasks.
+Example: A waiter pauses politely (async sleep) instead of freezing the restaurant (thread sleep).
 use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() {
-    let h = tokio::spawn(async {
-        sleep(Duration::from_secs(1)).await;
-        42
-    });
-    println!("Result = {}", h.await.unwrap());
+    println!("Start");
+    sleep(Duration::from_secs(1)).await; // Polite pause
+    println!("After 1 second");
 }
-```
 
----
-
-## 10. Iterators, Closures, Function Pointers
-
-### Example
-```rust
-fn iter_demo() {
-    let v = vec![1, 2, 3];
-    let doubled: Vec<_> = v.iter().map(|x| x * 2).collect();
-    println!("{:?}", doubled);
-
-    let add = |a: i32, b: i32| a + b;
-    println!("Sum = {}", add(2, 3));
-
-    let f: fn(i32) -> i32 = |x| x * x;
-    println!("Square = {}", f(4));
+Async vs Threads
+Async tasks cooperate and share time; threads run independently and can be preempted.
+Example: Async is like waiters taking turns serving; threads are like chefs cooking at the same time.
+4. Traits & Polymorphism
+Traits
+Traits define shared behavior, like interfaces in other languages.
+Example: A trait for animals that can make sounds.
+trait Animal {
+    fn make_sound(&self);
 }
-```
 
----
+struct Dog;
+struct Cat;
 
-## 11. Macros
+impl Animal for Dog {
+    fn make_sound(&self) {
+        println!("Woof!");
+    }
+}
 
-### Example
-```rust
+impl Animal for Cat {
+    fn make_sound(&self) {
+        println!("Meow!");
+    }
+}
+
+fn main() {
+    let dog = Dog;
+    let cat = Cat;
+    dog.make_sound();
+    cat.make_sound();
+}
+
+Pure Virtual-Like Methods
+Traits can define methods without implementation, like pure virtual functions.
+Example: An animal must make a sound, but each defines how.
+trait Animal {
+    fn make_sound(&self); // Must be implemented
+}
+
+struct Bird;
+impl Animal for Bird {
+    fn make_sound(&self) {
+        println!("Chirp!");
+    }
+}
+
+Default Methods
+Traits can have default implementations.
+Example: Animals can have a default way to sleep.
+trait Animal {
+    fn sleep(&self) {
+        println!("Zzz...");
+    }
+}
+
+struct Dog;
+impl Animal for Dog {}
+
+fn main() {
+    let dog = Dog;
+    dog.sleep(); // Uses default implementation
+}
+
+Trait Inheritance
+A trait can require another trait.
+Example: A pet must be an animal first.
+trait Animal {
+    fn eat(&self);
+}
+
+trait Pet: Animal {
+    fn play(&self);
+}
+
+struct Dog;
+impl Animal for Dog {
+    fn eat(&self) {
+        println!("Dog eats bone");
+    }
+}
+impl Pet for Dog {
+    fn play(&self) {
+        println!("Dog plays fetch");
+    }
+}
+
+Polymorphism with Vec<Box>
+Store different types implementing the same trait.
+Example: A zoo with different animals.
+trait Animal {
+    fn make_sound(&self);
+}
+
+struct Dog;
+struct Cat;
+
+impl Animal for Dog {
+    fn make_sound(&self) { println!("Woof!"); }
+}
+impl Animal for Cat {
+    fn make_sound(&self) { println!("Meow!"); }
+}
+
+fn main() {
+    let zoo: Vec<Box<dyn Animal>> = vec![Box::new(Dog), Box::new(Cat)];
+    for animal in zoo {
+        animal.make_sound();
+    }
+}
+
+Constructors
+Use fn new() -> Self for creating instances.
+Example: A car factory.
+struct Car {
+    model: String,
+}
+
+impl Car {
+    fn new(model: String) -> Self {
+        Car { model }
+    }
+}
+
+fn main() {
+    let car = Car::new(String::from("Sedan"));
+    println!("Car model: {}", car.model);
+}
+
+Destructors (Drop Trait)
+The Drop trait runs cleanup when an object goes out of scope.
+Example: A file that closes itself when done.
+struct File {
+    name: String,
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        println!("Closing file: {}", self.name);
+    }
+}
+
+fn main() {
+    let _file = File { name: String::from("data.txt") };
+    // File is closed automatically when scope ends
+}
+
+5. Memory & Abstractions
+Zero-Cost Abstractions
+Rust’s high-level code (like iterators) compiles to efficient machine code, like raw loops.
+Example: Using an iterator is as fast as a for loop.
+fn main() {
+    let numbers = vec![1, 2, 3];
+    let sum: i32 = numbers.iter().sum(); // As fast as a manual loop
+    println!("Sum: {}", sum);
+}
+
+RAII
+Resources are freed automatically when objects go out of scope.
+Example: A file closes itself when you’re done.
+struct File {
+    name: String,
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        println!("File {} closed", self.name);
+    }
+}
+
+fn main() {
+    let _file = File { name: String::from("log.txt") };
+    println!("Working with file");
+    // File closes automatically
+}
+
+Static Keyword
+static for single-instance variables, const for compile-time constants.
+Example: A counter for visitors vs. a fixed tax rate.
+static mut VISITORS: i32 = 0; // Shared counter
+const TAX_RATE: f64 = 0.08; // Fixed constant
+
+fn main() {
+    unsafe {
+        VISITORS += 1; // Unsafe because static mut is dangerous
+        println!("Visitors: {}", VISITORS);
+    }
+    println!("Tax rate: {}", TAX_RATE);
+}
+
+6. Macros
+Declarative Macros
+Simple macros for pattern matching.
+Example: A macro to say hello.
 macro_rules! say_hello {
     () => {
-        println!("Hello from macro!");
+        println!("Hello!");
     };
 }
 
 fn main() {
-    say_hello!();
+    say_hello!(); // Prints "Hello!"
 }
-```
 
----
-
-## 12. Error Handling
-
-### Example
-```rust
-fn might_fail(x: i32) -> Result<i32, String> {
-    if x > 0 { Ok(x) } else { Err("negative!".into()) }
+Procedural Macros
+Advanced macros like #[derive(Debug)].
+Example: Auto-generate debug formatting.
+#[derive(Debug)]
+struct Point {
+    x: i32,
+    y: i32,
 }
 
 fn main() {
-    match might_fail(-1) {
-        Ok(v) => println!("Value = {}", v),
-        Err(e) => println!("Error: {}", e),
+    let p = Point { x: 1, y: 2 };
+    println!("{:?}", p); // Prints "Point { x: 1, y: 2 }"
+}
+
+7. Patterns / Design Patterns
+Singleton
+Use lazy_static or once_cell::Lazy for a single instance.
+Example: One global configuration.
+use once_cell::sync::Lazy;
+
+static CONFIG: Lazy<i32> = Lazy::new(|| 42);
+
+fn main() {
+    println!("Config: {}", *CONFIG);
+}
+
+Builder
+Chain methods to build objects.
+Example: Build a sandwich step by step.
+struct Sandwich {
+    bread: String,
+    filling: String,
+}
+
+impl Sandwich {
+    fn new() -> SandwichBuilder {
+        SandwichBuilder {
+            bread: None,
+            filling: None,
+        }
     }
 }
-```
 
----
-
-## 13. Unsafe, FFI & Static
-
-### Example
-```rust
-static mut COUNTER: i32 = 0;
-
-unsafe fn increment() {
-    COUNTER += 1;
+struct SandwichBuilder {
+    bread: Option<String>,
+    filling: Option<String>,
 }
 
-extern "C" {
-    fn puts(s: *const i8);
-}
-```
-
----
-
-## 14. Storage Classes (C vs Rust)
-
-- `global` → module-level `static`.
-- `static` → single instance.
-- `extern` → link to external symbols.
-- `register` → no direct equivalent.
-- `thread_local!` macro for thread-local vars.
-
-### Example
-```rust
-use std::cell::RefCell;
-
-thread_local! {
-    static TL: RefCell<i32> = RefCell::new(0);
-}
-```
-
----
-
-## 15. Design Patterns
-
-- **Singleton** → `lazy_static!` or `OnceCell`.
-- **Builder** → chained methods.
-- **Observer** → channels.
-- **Strategy** → traits + dyn dispatch.
-- **State** → enums + match.
-
-### Example (Builder)
-```rust
-struct Config { a: i32, b: i32 }
-
-impl Config {
-    fn new() -> Self { Config { a: 0, b: 0 } }
-    fn a(mut self, v: i32) -> Self { self.a = v; self }
-    fn b(mut self, v: i32) -> Self { self.b = v; self }
+impl SandwichBuilder {
+    fn bread(mut self, bread: &str) -> Self {
+        self.bread = Some(bread.to_string());
+        self
+    }
+    fn filling(mut self, filling: &str) -> Self {
+        self.filling = Some(filling.to_string());
+        self
+    }
+    fn build(self) -> Sandwich {
+        Sandwich {
+            bread: self.bread.unwrap_or("White".to_string()),
+            filling: self.filling.unwrap_or("Cheese".to_string()),
+        }
+    }
 }
 
 fn main() {
-    let c = Config::new().a(1).b(2);
-    println!("Config: a={}, b={}", c.a, c.b);
+    let sandwich = Sandwich::new()
+        .bread("Rye")
+        .filling("Ham")
+        .build();
+    println!("Sandwich: {} with {}", sandwich.bread, sandwich.filling);
 }
-```
 
----
+Strategy
+Use traits for interchangeable algorithms.
+Example: Different ways to travel.
+trait Travel {
+    fn go(&self);
+}
 
-## 16. Common Interview Snippets
+struct Car;
+struct Bike;
 
-```rust
-// Reverse loop
-for i in (1..=5).rev() { println!("{}", i); }
+impl Travel for Car {
+    fn go(&self) {
+        println!("Driving a car");
+    }
+}
+impl Travel for Bike {
+    fn go(&self) {
+        println!("Riding a bike");
+    }
+}
 
-// Command line args
-let args: Vec<String> = std::env::args().collect();
+fn main() {
+    let transport: Box<dyn Travel> = Box::new(Car);
+    transport.go();
+}
 
-// Thread with name
-let handle = std::thread::Builder::new()
-    .name("worker".into())
-    .spawn(|| println!("hi")).unwrap();
+Observer
+Use channels (mpsc) to notify observers.
+Example: A weather station notifies subscribers.
+use std::sync::mpsc;
+use std::thread;
 
-// Atomic counter
-use std::sync::atomic::{AtomicUsize, Ordering};
-static CNT: AtomicUsize = AtomicUsize::new(0);
-CNT.fetch_add(1, Ordering::SeqCst);
-```
+fn main() {
+    let (tx, rx) = mpsc::channel();
+    let tx2 = tx.clone();
 
----
+    thread::spawn(move || {
+        tx2.send("Rainy").unwrap();
+    });
 
-# END
+    println!("Weather update: {}", rx.recv().unwrap());
+}
+
+RAII
+Resources are managed via scope, using Drop.
+Example: A resource that cleans itself up.
+struct Resource {
+    name: String,
+}
+
+impl Drop for Resource {
+    fn drop(&mut self) {
+        println!("Cleaning up {}", self.name);
+    }
+}
+
+fn main() {
+    let _r = Resource { name: String::from("Database") };
+    println!("Using resource");
+}
+
+Smart Pointers
+Box, Rc, Arc manage memory.
+Example: A shared book with Rc.
+use std::rc::Rc;
+
+fn main() {
+    let book = Rc::new(String::from("Rust Book"));
+    let reader1 = Rc::clone(&book);
+    let reader2 = Rc::clone(&book);
+    println!("Readers have: {}", book);
+}
+
+State Pattern
+Use enums and match for state transitions.
+Example: A traffic light.
+enum TrafficLight {
+    Red,
+    Yellow,
+    Green,
+}
+
+impl TrafficLight {
+    fn next(&self) -> TrafficLight {
+        match self {
+            TrafficLight::Red => TrafficLight::Yellow,
+            TrafficLight::Yellow => TrafficLight::Green,
+            TrafficLight::Green => TrafficLight::Red,
+        }
+    }
+}
+
+fn main() {
+    let mut light = TrafficLight::Red;
+    light = light.next();
+    match light {
+        TrafficLight::Yellow => println!("Yellow light"),
+        _ => println!("Other light"),
+    }
+}
+
+8. Extras / Misc
+Modules & Visibility
+Use pub for public items, private by default.
+Example: A library with private and public books.
+mod library {
+    pub fn public_book() {
+        println!("Public book");
+    }
+    fn private_book() {
+        println!("Private book");
+    }
+}
+
+fn main() {
+    library::public_book();
+    // library::private_book(); // Error: private
+}
+
+Error Handling
+Use Result and Option for safe error handling.
+Example: Try to open a file.
+use std::fs::File;
+
+fn main() -> Result<(), std::io::Error> {
+    let _file = File::open("data.txt")?; // ? propagates error
+    println!("File opened");
+    Ok(())
+}
+
+Function Pointers
+Store functions in variables.
+Example: A calculator function.
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn main() {
+    let f: fn(i32, i32) -> i32 = add;
+    println!("Sum: {}", f(2, 3));
+}
+
+Reverse Loop
+Iterate in reverse with .rev().
+Example: Count down like a rocket launch.
+fn main() {
+    for i in (1..=5).rev() {
+        println!("Countdown: {}", i);
+    }
+}
